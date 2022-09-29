@@ -93,7 +93,7 @@
       register: privsub3_out   
 
     - debug:
-       var: vpcout
+       var: privsub3_out 
 
     - name: internet gateway setup
       ec2_vpc_igw:
@@ -103,5 +103,21 @@
         resource_tags:
           Name: vprofile-igw
       register: igw_out
+   
+    - name: route table for public subnet
+      ec2_vpc_route_table:
+        vpc_id: "{{vpcout.vpc.id}}"
+        region: "{{region}}"
+        tags:
+          Name: pub_routetable
+        subnets:
+         - "{{privsub1_out.subnet.id}}"
+         - "{{privsub2_out.subnet.id}}" 
+         - "{{privsub3_out.subnet.id}}"
+        routes:
+         - dest: 0.0.0.0/0
+           gateway_id: "{{ igw_out.gateway_id }}"
+      register: public_route_out
+
 
         
