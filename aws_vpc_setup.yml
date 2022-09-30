@@ -16,9 +16,6 @@
         tenancy: default
         state: "{{state}}"
       register: vpcout
-
-#    - debug:
-#       var: vpcout
         
     - name: Create public subnet 1 in zone1
       ec2_vpc_subnet:
@@ -92,9 +89,6 @@
           Name: vprofile-PrivSub3
       register: privsub3_out   
 
-    - debug:
-       var: privsub3_out 
-
     - name: internet gateway setup
       ec2_vpc_igw:
         vpc_id: "{{vpcout.vpc.id}}"
@@ -119,5 +113,57 @@
            gateway_id: "{{ igw_out.gateway_id }}"
       register: public_route_out
 
+    - name: Create new nat gateway, using an EIP address  and wait for available status.
+      ec2_vpc_nat_gateway:
+       state: "{{state}}"
+       subnet_id: "{{pubsub3_out.subnet.id}}"
+       wait: yes
+       region: "{{region}}"
+       if_exist_do_not_create: true
+       resource_tags:
+         Name: vprofile-igw
+      register: nat_gateway_out
 
-        
+    
+    - name: route table for private subnet
+      ec2_vpc_route_table:
+        vpc_id: "{{vpcout.vpc.id}}"
+        region: "{{region}}"
+        tags:
+          Name: priv_routetable
+        subnets:
+         - "{{privsub1_out.subnet.id}}"
+         - "{{privsub2_out.subnet.id}}" 
+         - "{{privsub3_out.subnet.id}}"
+        routes:
+         - dest: 0.0.0.0/0
+           gateway_id: "{{ nat_gateway_out.nat_gateway_id }}"
+      register: private_route_out
+    
+    - debug:
+       var: "{{item}}"
+      loop:
+       - vpcout.vpc.id 
+       - pubsub1_out.subnet.id
+       - pubsub2_out.subnet.id
+       - pubsub3_out.subnet.id
+       - privsub1_out.subnet.id
+       - privsub2_out.subnet.id
+       - privsub3_out.subnet.id
+       - igw_out.gateway_id
+       - public_route_out
+       - nat_gateway_out.nat_gateway_id
+       - private_route_out
+    - set_fact:
+       vpc_id: "{{vpcout.vpc.id}}"
+       pubsub1id: "{{pubsub1_out.subnet.id}}"
+       pubsub2id: "{{pubsub2_out.subnet.id}}" 
+       pubsub3id: "{{pubsub3_out.subnet.id}}"
+       privsub1id: "{{privsub1_out.subnet.id}}"
+       privsub2id: "{{privsub2_out.subnet.id}}"
+       privsub3id: "{{privsub3_out.subnet.id}}"
+       igw_id: "{{ igw_out.gateway_id }}"
+       public_rt_id: "{{public_route_out.route_table.id}}"  
+       nat_id: "{{ nat_gateway_out.nat_gateway_id }}"
+       private_rt_id: "{{private_route_out.route_table.id}}" 
+       cacheable: yes 
